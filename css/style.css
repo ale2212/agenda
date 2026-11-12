@@ -663,3 +663,45 @@ input.carico {
   font-weight: 600;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
 }
+
+/* ---------------------------------------------------------------- abitudini settimanali */
+.frequenza { gap: 10px; }
+.frequenza .etichetta { margin-bottom: 0; }
+.contatore {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--campo);
+}
+.contatore button {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--superficie);
+  color: var(--accento);
+  font-size: 24px;
+  font-weight: 600;
+}
+.contatore-numero {
+  font: 700 26px var(--numeri);
+  font-variant-numeric: tabular-nums;
+  margin-right: 4px;
+}
+.modifica .contatore { background: var(--superficie); }
+.modifica .contatore button { background: var(--campo); }
+
+.calendario.settimanale { grid-template-columns: repeat(7, 1fr) 1.4fr; max-width: 340px; }
+.totale-sett {
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  font: 600 12px var(--numeri);
+  font-variant-numeric: tabular-nums;
+}
+.totale-sett.riuscita { background: var(--accento); color: var(--su-accento); }
+.totale-sett.mancata { background: color-mix(in srgb, var(--cattivo) 16%, var(--superficie)); color: var(--cattivo); }
+.totale-sett.in-corso { border: 2px dashed var(--linea); color: var(--tenue); }
