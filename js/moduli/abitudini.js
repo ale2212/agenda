@@ -104,11 +104,14 @@ function sceltaGiorni(giorni, alCambio) {
         type: "button", class: attivo ? "attivo" : "", "aria-pressed": attivo ? "true" : "false",
         "aria-label": s.nome,
         onclick: (e) => {
-          const nuovi = attivo ? giorni.filter((g) => g !== s.n) : [...giorni, s.n];
+          // Lo stato si legge ADESSO, non quando il bottone è stato creato:
+          // altrimenti dopo il primo tocco il bottone "crede" di essere ancora attivo.
+          const eraAttivo = giorni.includes(s.n);
+          const nuovi = eraAttivo ? giorni.filter((g) => g !== s.n) : [...giorni, s.n];
           if (!nuovi.length) { avviso("Scegli almeno un giorno"); return; }
           giorni.splice(0, giorni.length, ...nuovi);
-          e.currentTarget.classList.toggle("attivo", !attivo);
-          e.currentTarget.setAttribute("aria-pressed", String(!attivo));
+          e.currentTarget.classList.toggle("attivo", !eraAttivo);
+          e.currentTarget.setAttribute("aria-pressed", String(!eraAttivo));
           alCambio?.();
         },
       }, s.breve);
