@@ -14,6 +14,9 @@ const NOMI = {
   "palestra.schede": "Schede",
   "palestra.registro": "Carichi registrati",
   "palestra.misure": "Misurazioni",
+  "palestra.dieta": "Diete",
+  "abitudini.lista": "Abitudini",
+  "abitudini.fatte": "Abitudini spuntate",
 };
 
 function ultimoBackup() {

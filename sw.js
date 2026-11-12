@@ -6,7 +6,7 @@
 // scarica i file nuovi in background e li usa dall'apertura successiva.
 // =============================================================================
 
-const VERSIONE = "agenda-v1";
+const VERSIONE = "agenda-v2";
 
 const FILE = [
   "./",
@@ -18,6 +18,7 @@ const FILE = [
   "./js/ui.js",
   "./js/moduli/finanze.js",
   "./js/moduli/palestra.js",
+  "./js/moduli/abitudini.js",
   "./js/moduli/dati.js",
   "./icone/icona-180.png",
   "./icone/icona-192.png",
@@ -25,7 +26,9 @@ const FILE = [
 ];
 
 self.addEventListener("install", (evento) => {
-  evento.waitUntil(caches.open(VERSIONE).then((cache) => cache.addAll(FILE)));
+  // cache: "reload" = scarica sempre dal sito, mai da copie temporanee del browser
+  evento.waitUntil(caches.open(VERSIONE).then((cache) =>
+    cache.addAll(FILE.map((f) => new Request(f, { cache: "reload" })))));
   self.skipWaiting();
 });
 

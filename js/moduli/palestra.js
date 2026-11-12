@@ -4,13 +4,14 @@
 //   "palestra.schede"   → { nome, dataInizio, note, esercizi: [{ id, giorno, nome, serie, ripetizioni, recupero, note }] }
 //   "palestra.registro" → { data, esercizio, carico, ripetizioni, note }
 //   "palestra.misure"   → { data, valori: { peso: 72.4, massa_grassa: 16.1, ... } }
+//   "palestra.dieta"    → { nome, dataInizio, note, voci: [{ id, pasto, alimento, quantita, note }] }
 //
 // Il registro salva il NOME dell'esercizio: i progressi su "Panca piana"
 // continuano anche quando passi a una scheda nuova.
 // =============================================================================
 
 import { h, numero, oggi, dataBreve, giorniFa, leggiNumero, avviso, segmenti, campo,
-         inputNumero, vuoto, conferma, graficoLinea } from "../ui.js";
+         inputNumero, vuoto, conferma, graficoLinea, formModifica } from "../ui.js";
 
 const SCHEDE = "palestra.schede";
 const REGISTRO = "palestra.registro";
@@ -307,6 +308,57 @@ async function misure(el, ctx) {
 }
 
 // ================================================================ SCHEDE
+let esercizioInModifica = null;   // id dell'esercizio aperto in modifica
+let intestazioneAperta = null;    // "collezione:id" del documento di cui stai modificando nome e data
+
+/** Sposta un elemento di un posto (delta = -1 su, +1 giù) tra quelli dello stesso gruppo. */
+function spostaNelGruppo(lista, elemento, gruppo, delta) {
+  const stessi = lista.filter((x) => x[gruppo] === elemento[gruppo]);
+  const altro = stessi[stessi.indexOf(elemento) + delta];
+  if (!altro) return false;
+  const i = lista.indexOf(elemento), j = lista.indexOf(altro);
+  [lista[i], lista[j]] = [lista[j], lista[i]];
+  return true;
+}
+
+/** Intestazione con nome e data, modificabile (usata da schede e dieta). */
+function intestazioneModificabile(doc, ctx, nomeTipo) {
+  const chiaveDoc = `${doc.collezione}:${doc.id}`;
+  if (intestazioneAperta !== chiaveDoc) {
+    return h("div", { class: "titolo-scheda" },
+      h("div", {},
+        h("h2", {}, doc.nome),
+        h("p", { class: "nota" }, `Dal ${dataBreve(doc.dataInizio)}`),
+        doc.note ? h("p", { class: "nota-trainer" }, doc.note) : null),
+      h("button", { type: "button", class: "link", onclick: () => { intestazioneAperta = chiaveDoc; ctx.ricarica(); } },
+        "Rinomina"));
+  }
+  return formModifica({
+    valori: doc,
+    campi: [
+      { chiave: "nome", etichetta: `Nome della ${nomeTipo}` },
+      { chiave: "dataInizio", etichetta: "Inizio", attributi: { type: "date" } },
+      { chiave: "note", etichetta: "Note generali", intera: true, attributi: { placeholder: "Facoltative" } },
+    ],
+    annulla: () => { intestazioneAperta = null; ctx.ricarica(); },
+    salva: async (m) => {
+      if (!m.nome.trim()) { avviso("Il nome non può essere vuoto"); return; }
+      await ctx.db.aggiorna({ ...doc, nome: m.nome.trim(), dataInizio: m.dataInizio || doc.dataInizio, note: (m.note || "").trim() });
+      intestazioneAperta = null;
+      avviso("Modifiche salvate");
+      ctx.ricarica();
+    },
+  });
+}
+
+/** Bottoni per spostare su e giù l'elemento in modifica. */
+function bottoniSposta(sposta) {
+  return h("div", { class: "sposta" },
+    h("span", { class: "etichetta" }, "Posizione"),
+    h("button", { type: "button", class: "secondario", "aria-label": "Sposta su", onclick: () => sposta(-1) }, "↑ Su"),
+    h("button", { type: "button", class: "secondario", "aria-label": "Sposta giù", onclick: () => sposta(1) }, "↓ Giù"));
+}
+
 async function schede(el, ctx) {
   const tutte = await leggiSchede(ctx.db);
   const registro = await leggiRegistro(ctx.db);
@@ -335,36 +387,77 @@ async function schede(el, ctx) {
   const scheda = tutte.find((s) => s.id === schedaScelta) || tutte[0];
   if (tutte.length > 1) {
     el.append(campo("Scheda", h("select", {
-      onchange: (e) => { schedaScelta = Number(e.target.value); ctx.ricarica(); },
+      onchange: (e) => { schedaScelta = Number(e.target.value); esercizioInModifica = null; ctx.ricarica(); },
     }, tutte.map((s) => h("option", { value: s.id, selected: s.id === scheda.id }, `${s.nome} (dal ${dataBreve(s.dataInizio)})`)))));
   }
 
   const salvaScheda = async () => { await ctx.db.aggiorna(scheda); ctx.ricarica(); };
 
-  el.append(h("div", { class: "titolo-scheda" },
-    h("h2", {}, scheda.nome), h("p", { class: "nota" }, `Dal ${dataBreve(scheda.dataInizio)}`)));
-
-  const giorni = giorniDi(scheda);
-  if (!giorni.length) el.append(h("p", { class: "nota" }, "Nessun esercizio: aggiungi il primo qui sotto."));
-  for (const g of giorni) {
-    el.append(h("h3", { class: "titolo-giorno" }, g),
-      h("ul", { class: "elenco" }, scheda.esercizi.filter((e) => e.giorno === g).map((e) =>
-        h("li", { class: "riga" },
-          h("div", { class: "riga-testo" },
-            h("span", { class: "riga-titolo" }, e.nome),
-            h("span", { class: "riga-sotto" }, [obiettivo(e), e.note].filter(Boolean).join(". "))),
-          h("button", { class: "elimina", type: "button", "aria-label": `Elimina ${e.nome}`,
-            onclick: async () => {
-              if (await conferma(`Togliere ${e.nome} dalla scheda?`)) {
-                scheda.esercizi = scheda.esercizi.filter((x) => x.id !== e.id);
-                await salvaScheda();
-              }
-            } }, "×")))));
-  }
-
   // Nomi già usati: suggeriti mentre scrivi, così restano sempre uguali
   const nomiNoti = [...new Set([...tutte.flatMap((s) => s.esercizi.map((e) => e.nome)), ...registro.map((r) => r.esercizio)])]
     .sort((a, b) => a.localeCompare(b, "it"));
+  const giorni = giorniDi(scheda);
+
+  el.append(intestazioneModificabile(scheda, ctx, "scheda"),
+    h("datalist", { id: "lista-giorni" }, giorni.map((g) => h("option", { value: g }))),
+    h("datalist", { id: "lista-esercizi" }, nomiNoti.map((n) => h("option", { value: n }))));
+
+  const modificaEsercizio = (e) => formModifica({
+    valori: { ...e, serie: e.serie === "" || e.serie === null ? "" : String(e.serie) },
+    campi: [
+      { chiave: "nome", etichetta: "Esercizio", attributi: { list: "lista-esercizi" } },
+      { chiave: "giorno", etichetta: "Giorno", attributi: { list: "lista-giorni" } },
+      { chiave: "serie", etichetta: "Serie", attributi: { inputmode: "numeric" } },
+      { chiave: "ripetizioni", etichetta: "Ripetizioni" },
+      { chiave: "recupero", etichetta: "Recupero" },
+      { chiave: "note", etichetta: "Note del trainer", intera: true },
+    ],
+    extra: bottoniSposta(async (delta) => {
+      if (spostaNelGruppo(scheda.esercizi, e, "giorno", delta)) await salvaScheda();
+    }),
+    annulla: () => { esercizioInModifica = null; ctx.ricarica(); },
+    salva: async (m) => {
+      if (!m.nome.trim() || !m.giorno.trim()) { avviso("Indica giorno ed esercizio"); return; }
+      // Se il nuovo nome coincide con un altro esercizio già usato, prende la sua grafia
+      const nome = nomiNoti.find((n) => chiave(n) === chiave(m.nome) && chiave(n) !== chiave(e.nome)) || m.nome.trim();
+      if (nome !== e.nome) {
+        const vecchi = registro.filter((r) => chiave(r.esercizio) === chiave(e.nome));
+        if (vecchi.length && await conferma(
+          `Hai ${vecchi.length} ${vecchi.length === 1 ? "carico registrato" : "carichi registrati"} come "${e.nome}". ` +
+          `Vuoi correggere anche ${vecchi.length === 1 ? "quello" : "quelli"} in "${nome}"? Così i progressi restano uniti.`)) {
+          for (const r of vecchi) await ctx.db.aggiorna({ ...r, esercizio: nome });
+        }
+      }
+      Object.assign(e, { nome, giorno: m.giorno.trim(), serie: leggiNumero(m.serie) ?? "",
+        ripetizioni: m.ripetizioni.trim(), recupero: m.recupero.trim(), note: m.note.trim() });
+      esercizioInModifica = null;
+      avviso("Esercizio aggiornato");
+      await salvaScheda();
+    },
+  });
+
+  if (!giorni.length) el.append(h("p", { class: "nota" }, "Nessun esercizio: aggiungi il primo qui sotto."));
+  else el.append(h("p", { class: "nota" }, "Tocca un esercizio per modificarlo o spostarlo."));
+  for (const g of giorni) {
+    el.append(h("h3", { class: "titolo-giorno" }, g),
+      h("ul", { class: "elenco" }, scheda.esercizi.filter((e) => e.giorno === g).map((e) =>
+        e.id === esercizioInModifica
+          ? h("li", {}, modificaEsercizio(e))
+          : h("li", { class: "riga-con-azione" },
+              h("button", { type: "button", class: "riga riga-tocca", "aria-label": `Modifica ${e.nome}`,
+                onclick: () => { esercizioInModifica = e.id; ctx.ricarica(); } },
+                h("div", { class: "riga-testo" },
+                  h("span", { class: "riga-titolo" }, e.nome),
+                  h("span", { class: "riga-sotto" }, [obiettivo(e), e.note].filter(Boolean).join(". ")))),
+              h("button", { class: "elimina", type: "button", "aria-label": `Elimina ${e.nome}`,
+                onclick: async () => {
+                  if (await conferma(`Togliere ${e.nome} dalla scheda?`)) {
+                    scheda.esercizi = scheda.esercizi.filter((x) => x.id !== e.id);
+                    await salvaScheda();
+                  }
+                } }, "×")))));
+  }
+
   if (!bozzaEsercizio.giorno) bozzaEsercizio.giorno = giorni.at(-1) || "Giorno A";
   const b = bozzaEsercizio;
   const legato = (k, attr = {}) => h("input", { type: "text", value: b[k], ...attr, oninput: (e) => (b[k] = e.target.value) });
@@ -374,8 +467,6 @@ async function schede(el, ctx) {
     h("div", { class: "due-colonne" },
       campo("Giorno", legato("giorno", { list: "lista-giorni", placeholder: "es. Giorno A" })),
       campo("Esercizio", legato("nome", { list: "lista-esercizi", placeholder: "es. Panca piana", autocapitalize: "sentences" }))),
-    h("datalist", { id: "lista-giorni" }, giorni.map((g) => h("option", { value: g }))),
-    h("datalist", { id: "lista-esercizi" }, nomiNoti.map((n) => h("option", { value: n }))),
     h("div", { class: "tre-colonne" },
       campo("Serie", legato("serie", { inputmode: "numeric" })),
       campo("Ripetizioni", legato("ripetizioni")),
@@ -410,6 +501,164 @@ async function schede(el, ctx) {
       } }, "Elimina scheda")));
 }
 
+// ================================================================ DIETA
+// Una dieta: { nome, dataInizio, note, voci: [{ id, pasto, alimento, quantita, note }] }
+// La quantità è testo libero ("80 g", "1 vasetto", "q.b."), come la scrive il nutrizionista.
+const DIETA = "palestra.dieta";
+// I pasti con questi nomi vengono messi in quest'ordine; gli altri seguono.
+const ORDINE_PASTI = ["colazione", "spuntino", "spuntino mattina", "pranzo", "merenda",
+  "spuntino pomeriggio", "pre allenamento", "post allenamento", "cena", "dopo cena"];
+
+let dietaScelta = null;
+let dietaInModifica = false;      // modalità modifica attiva
+let voceInModifica = null;
+let bozzaVoce = { pasto: "Colazione", alimento: "", quantita: "", note: "" };
+
+async function leggiDiete(db) {
+  const d = await db.tutti(DIETA);
+  return d.sort((a, b) => b.dataInizio.localeCompare(a.dataInizio) || b.id - a.id);
+}
+
+function pastiDi(dieta) {
+  const pasti = [...new Set(dieta.voci.map((v) => v.pasto))];
+  const posizione = (p) => {
+    const i = ORDINE_PASTI.indexOf(p.toLowerCase());
+    return i === -1 ? 100 + pasti.indexOf(p) : i;
+  };
+  return pasti.sort((a, b) => posizione(a) - posizione(b));
+}
+
+async function dieta(el, ctx) {
+  const diete = await leggiDiete(ctx.db);
+
+  const formNuova = () => {
+    const nome = h("input", { type: "text", value: diete.length ? "" : "La mia dieta", placeholder: "es. Dieta novembre" });
+    const inizio = h("input", { type: "date", value: oggi() });
+    return h("details", { class: "gruppo apribile", open: !diete.length },
+      h("summary", {}, "Nuova dieta"),
+      campo("Nome", nome),
+      campo("Inizio", inizio),
+      h("button", { class: "primario", type: "button", onclick: async () => {
+        if (!nome.value.trim()) { avviso("Dai un nome alla dieta"); nome.focus(); return; }
+        dietaScelta = await ctx.db.aggiungi(DIETA, {
+          nome: nome.value.trim(), dataInizio: inizio.value || oggi(), note: "", voci: [] });
+        dietaInModifica = true;
+        avviso("Dieta creata: aggiungi gli alimenti");
+        ctx.ricarica();
+      } }, "Crea dieta"));
+  };
+
+  if (!diete.length) {
+    el.append(vuoto("Inserisci la dieta del nutrizionista per averla sempre a portata di mano."), formNuova());
+    return;
+  }
+
+  const d = diete.find((x) => x.id === dietaScelta) || diete[0];
+  const salvaDieta = async () => { await ctx.db.aggiorna(d); ctx.ricarica(); };
+  const pasti = pastiDi(d);
+
+  if (diete.length > 1) {
+    el.append(campo("Dieta", h("select", {
+      onchange: (e) => { dietaScelta = Number(e.target.value); voceInModifica = null; ctx.ricarica(); },
+    }, diete.map((x) => h("option", { value: x.id, selected: x.id === d.id }, `${x.nome} (dal ${dataBreve(x.dataInizio)})`)))));
+  }
+
+  const alterna = () => { dietaInModifica = !dietaInModifica; voceInModifica = null; intestazioneAperta = null; ctx.ricarica(); };
+  // append() di un elemento HTML non accetta liste: con "..." le "spacchettiamo"
+  el.append(...(dietaInModifica
+    ? [intestazioneModificabile(d, ctx, "dieta"),
+       h("button", { type: "button", class: "primario", onclick: alterna }, "Fine modifiche"),
+       h("p", { class: "nota" }, "Tocca un alimento per modificarlo o spostarlo.")]
+    : [h("div", { class: "titolo-scheda" },
+        h("div", {},
+          h("h2", {}, d.nome),
+          h("p", { class: "nota" }, `Dal ${dataBreve(d.dataInizio)}`),
+          d.note ? h("p", { class: "nota-trainer" }, d.note) : null),
+        h("button", { type: "button", class: "link", onclick: alterna }, "Modifica"))]));
+
+  if (!pasti.length) el.append(h("p", { class: "nota" }, "Nessun alimento: aggiungi il primo qui sotto."));
+
+  const modificaVoce = (v) => formModifica({
+    valori: v,
+    campi: [
+      { chiave: "alimento", etichetta: "Alimento" },
+      { chiave: "quantita", etichetta: "Quantità" },
+      { chiave: "pasto", etichetta: "Pasto", attributi: { list: "lista-pasti" } },
+      { chiave: "note", etichetta: "Note o alternative" },
+    ],
+    extra: bottoniSposta(async (delta) => { if (spostaNelGruppo(d.voci, v, "pasto", delta)) await salvaDieta(); }),
+    annulla: () => { voceInModifica = null; ctx.ricarica(); },
+    salva: async (m) => {
+      if (!m.alimento.trim() || !m.pasto.trim()) { avviso("Indica pasto e alimento"); return; }
+      Object.assign(v, { alimento: m.alimento.trim(), quantita: m.quantita.trim(), pasto: m.pasto.trim(), note: m.note.trim() });
+      voceInModifica = null;
+      avviso("Alimento aggiornato");
+      await salvaDieta();
+    },
+  });
+
+  for (const p of pasti) {
+    el.append(h("h3", { class: "titolo-giorno" }, p),
+      h("ul", { class: "elenco" }, d.voci.filter((v) => v.pasto === p).map((v) => {
+        const contenuto = [
+          h("div", { class: "riga-testo" },
+            h("span", { class: "riga-titolo" }, v.alimento),
+            v.note ? h("span", { class: "riga-sotto" }, v.note) : null),
+          v.quantita ? h("span", { class: "quantita" }, v.quantita) : null,
+        ];
+        if (!dietaInModifica) return h("li", { class: "riga" }, contenuto);
+        if (v.id === voceInModifica) return h("li", {}, modificaVoce(v));
+        return h("li", { class: "riga-con-azione" },
+          h("button", { type: "button", class: "riga riga-tocca", "aria-label": `Modifica ${v.alimento}`,
+            onclick: () => { voceInModifica = v.id; ctx.ricarica(); } }, contenuto),
+          h("button", { class: "elimina", type: "button", "aria-label": `Elimina ${v.alimento}`,
+            onclick: async () => {
+              if (await conferma(`Togliere ${v.alimento} da ${p}?`)) {
+                d.voci = d.voci.filter((x) => x.id !== v.id);
+                await salvaDieta();
+              }
+            } }, "×"));
+      })));
+  }
+
+  if (!dietaInModifica) return;
+
+  const b = bozzaVoce;
+  const legato = (k, attr = {}) => h("input", { type: "text", value: b[k], ...attr, oninput: (e) => (b[k] = e.target.value) });
+  const suggeriti = [...new Set([...pasti, "Colazione", "Spuntino", "Pranzo", "Merenda", "Cena"])];
+  el.append(
+    h("datalist", { id: "lista-pasti" }, suggeriti.map((p) => h("option", { value: p }))),
+    h("section", { class: "gruppo" },
+      h("h2", { class: "nel-gruppo" }, "Aggiungi alimento"),
+      campo("Pasto", legato("pasto", { list: "lista-pasti" })),
+      h("div", { class: "due-colonne" },
+        campo("Alimento", legato("alimento", { placeholder: "es. Fiocchi d'avena", autocapitalize: "sentences" })),
+        campo("Quantità", legato("quantita", { placeholder: "es. 50 g" }))),
+      campo("Note o alternative", legato("note", { placeholder: "es. oppure 60 g di pane integrale" })),
+      h("button", { class: "primario", type: "button", onclick: async () => {
+        if (!b.pasto.trim() || !b.alimento.trim()) { avviso("Indica pasto e alimento"); return; }
+        d.voci.push({ id: nuovoId(), pasto: b.pasto.trim(), alimento: b.alimento.trim(),
+          quantita: b.quantita.trim(), note: b.note.trim() });
+        avviso(`${b.alimento.trim()} aggiunto`);
+        bozzaVoce = { pasto: b.pasto, alimento: "", quantita: "", note: "" }; // il pasto resta: comodo per inserirne tanti
+        await salvaDieta();
+      } }, "Aggiungi alla dieta")),
+    formNuova(),
+    h("div", { class: "azioni-secondarie" },
+      h("button", { type: "button", class: "secondario", onclick: async () => {
+        dietaScelta = await ctx.db.aggiungi(DIETA, {
+          nome: `${d.nome} (copia)`, dataInizio: oggi(), note: d.note,
+          voci: d.voci.map((v) => ({ ...v, id: nuovoId() })) });
+        avviso("Dieta duplicata: modifica solo ciò che cambia");
+        ctx.ricarica();
+      } }, "Duplica dieta"),
+      h("button", { type: "button", class: "secondario pericolo", onclick: async () => {
+        if (await conferma(`Eliminare "${d.nome}"?`)) {
+          await ctx.db.elimina(d.id); dietaScelta = null; ctx.ricarica();
+        }
+      } }, "Elimina dieta")));
+}
+
 // ================================================================ HOME
 async function riepilogo(ctx) {
   const storico = await leggiMisure(ctx.db);
@@ -436,6 +685,7 @@ export default {
     { id: "progressi", nome: "Progressi", render: progressi },
     { id: "misure", nome: "Misure", render: misure },
     { id: "schede", nome: "Schede", render: schede },
+    { id: "dieta", nome: "Dieta", render: dieta },
   ],
   riepilogo,
 };

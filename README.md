@@ -1,6 +1,6 @@
 # Agenda
 
-App personale per iPhone (PWA): Finanze e Palestra. Funziona offline e i dati restano sul telefono.
+App personale per iPhone (PWA): Finanze, Palestra (con dieta) e Abitudini. Funziona offline e i dati restano sul telefono.
 
 ## Pubblicarla su GitHub Pages (una volta sola)
 
@@ -19,9 +19,12 @@ App personale per iPhone (PWA): Finanze e Palestra. Funziona offline e i dati re
 
 ## Aggiornarla
 
-1. Sostituisci i file modificati nel repository (stessa procedura di upload).
-2. In `sw.js` aumenta il numero di `VERSIONE` (es. `agenda-v2`): altrimenti il telefono continua a usare la copia salvata.
-3. Sul telefono apri l'app due volte: la prima scarica la versione nuova, la seconda la usa.
+1. Nel repository: **Add file** → **Upload files** e trascina di nuovo tutto il contenuto della cartella
+   (i file con lo stesso nome vengono sostituiti) → **Commit changes**.
+2. Il numero di `VERSIONE` in `sw.js` deve cambiare a ogni aggiornamento (es. `agenda-v2` → `agenda-v3`):
+   è così che il telefono capisce che c'è una versione nuova. Se le modifiche le prepara Claude, lo fa già lui.
+3. Dopo 1-2 minuti apri l'app sul telefono: dopo qualche secondo compare in alto
+   "Nuova versione disponibile. Tocca per aggiornare".
 
 I dati non vengono toccati dagli aggiornamenti.
 
@@ -49,7 +52,8 @@ js/app.js               navigazione ed elenco dei moduli
 js/db.js                database sul telefono
 js/ui.js                strumenti comuni (grafici, formati, ...)
 js/moduli/finanze.js    modulo Finanze
-js/moduli/palestra.js   modulo Palestra
+js/moduli/palestra.js   modulo Palestra (allenamento, progressi, misure, schede, dieta)
+js/moduli/abitudini.js  modulo Abitudini
 js/moduli/dati.js       backup
 ```
 

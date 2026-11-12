@@ -14,6 +14,7 @@
 
   --finanze: #0e7a6b;     /* verde petrolio */
   --palestra: #3346c8;    /* blu oltremare */
+  --abitudini: #a3366f;   /* lampone */
   --entrata: #0e7a6b;
   --uscita: #b6432f;
   --buono: #1b7f47;
@@ -40,6 +41,7 @@
     --campo: #242a30;
     --finanze: #3fc4b0;
     --palestra: #93a1ff;
+    --abitudini: #f08fc4;
     --entrata: #3fc4b0;
     --uscita: #f08a75;
     --buono: #5fd394;
@@ -227,6 +229,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
   font-weight: 600;
   font-size: 14px;
 }
+/* con 5 o più sezioni le etichette si stringono per stare tutte sullo schermo */
+.segmenti:has(button:nth-child(5)) button { font-size: 13px; padding: 7px 4px; letter-spacing: -0.01em; }
+.contenuto > .secondario, .azioni-secondarie .secondario { background: var(--superficie); }
 .azioni-secondarie { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
 
 /* controllo a segmenti */
@@ -241,11 +246,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .segmenti::-webkit-scrollbar { display: none; }
 .segmenti button {
-  flex: 1 0 auto;
+  flex: 1 1 auto;
   border: 0;
   background: none;
   border-radius: 8px;
-  padding: 7px 10px;
+  padding: 7px 6px;
   font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
@@ -426,6 +431,7 @@ input.carico {
 
 .riga-data { max-width: 220px; }
 
+.titolo-scheda { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .titolo-scheda h2 { margin: 6px 0 0; }
 .titolo-giorno { font-size: 15px; color: var(--accento); margin: 10px 0 -6px 4px; }
 
@@ -531,4 +537,129 @@ input.carico {
 
 @media (prefers-reduced-motion: reduce) {
   #avviso { transition: none; }
+}
+
+/* ---------------------------------------------------------------- modifica in linea */
+.riga-con-azione { display: flex; align-items: center; padding-right: 8px; }
+.riga-con-azione .riga-tocca { flex: 1; min-width: 0; padding-right: 8px; }
+.modifica {
+  padding: 14px 16px 16px;
+  background: color-mix(in srgb, var(--accento) 7%, var(--superficie));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.griglia-modifica { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.griglia-modifica .intera { grid-column: 1 / -1; }
+.modifica input { background: var(--superficie); }
+.azioni-modifica { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sposta { display: flex; align-items: center; gap: 8px; }
+.sposta .etichetta { margin: 0 auto 0 0; }
+.sposta .secondario { width: auto; min-height: 40px; padding: 8px 14px; font-size: 15px; background: var(--superficie); }
+
+/* ---------------------------------------------------------------- dieta */
+.quantita {
+  font-family: var(--numeri);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--accento);
+}
+.riga-tocca .quantita { margin-left: auto; }
+
+/* ---------------------------------------------------------------- abitudini */
+.progresso { display: flex; flex-direction: column; gap: 8px; }
+.progresso-testo { display: flex; align-items: baseline; gap: 8px; }
+.progresso .barra-piena { background: var(--accento); transition: width 0.3s; }
+
+.abitudine {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 16px;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+.spunta {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid var(--linea);
+  display: grid;
+  place-items: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+.spunta svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--su-accento);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.15s, transform 0.2s;
+}
+.abitudine.fatta .spunta { background: var(--accento); border-color: var(--accento); }
+.abitudine.fatta .spunta svg { opacity: 1; transform: none; }
+.abitudine.fatta .riga-titolo { color: var(--tenue); }
+
+.calendario {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+  max-width: 300px;
+}
+.intestazione-cal { text-align: center; font-size: 12px; color: var(--tenue); }
+.cella { display: block; aspect-ratio: 1; border-radius: 6px; }
+.cella.fatto { background: var(--accento); }
+.cella.mancato { background: color-mix(in srgb, var(--cattivo) 16%, var(--superficie)); }
+.cella.oggi { border: 2px dashed var(--linea); }
+.cella.libero { background: var(--campo); }
+.cella.futuro, .cella.prima { background: transparent; border: 1px solid var(--linea); }
+.legenda-cal { display: flex; gap: 16px; font-size: 13px; color: var(--tenue); flex-wrap: wrap; }
+.legenda-cal > span { display: flex; align-items: center; gap: 6px; }
+.legenda-cal .cella { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--linea); }
+.legenda-cal .cella.fatto { background: var(--abitudini); }
+
+.giorni-scelta { display: flex; gap: 6px; }
+.giorni-scelta button {
+  flex: 1;
+  aspect-ratio: 1;
+  max-width: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--linea);
+  background: var(--superficie);
+  font-weight: 600;
+  font-size: 15px;
+  padding: 0;
+}
+.giorni-scelta button.attivo { background: var(--accento); border-color: var(--accento); color: var(--su-accento); }
+
+@media (prefers-reduced-motion: reduce) {
+  .spunta, .spunta svg, .progresso .barra-piena { transition: none; }
+}
+
+/* ---------------------------------------------------------------- avviso di aggiornamento */
+#aggiornamento {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--inchiostro);
+  color: var(--carta);
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
 }

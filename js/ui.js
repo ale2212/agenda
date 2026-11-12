@@ -57,15 +57,24 @@ export function leggiNumero(testo) {
 // ------------------------------------------------------------------ date
 // Le date sono salvate come testo "AAAA-MM-GG": si ordinano bene e non hanno
 // problemi di fuso orario.
-export function oggi() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
+const aISO = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+export const oggi = () => aISO(new Date());
 
 function daISO(iso) {
   const [a, m, g] = iso.split("-").map(Number);
   return new Date(a, m - 1, g);
 }
+
+/** Sposta una data di n giorni: spostaGiorno("2026-11-12", -1) → "2026-11-11" */
+export function spostaGiorno(iso, n) {
+  const d = daISO(iso);
+  d.setDate(d.getDate() + n);
+  return aISO(d);
+}
+/** Giorno della settimana: 0 = domenica, 1 = lunedì, ... 6 = sabato */
+export const giornoSettimana = (iso) => daISO(iso).getDay();
 
 export const dataBreve = (iso) =>
   daISO(iso).toLocaleDateString("it-IT", { day: "numeric", month: "short" });
@@ -214,4 +223,28 @@ export function graficoBarre(dati, { formato = euro } = {}) {
     svg.append(s("text", { x: cx, y: A - 7, class: "asse", "text-anchor": "middle" }, d.etichetta));
   });
   return svg;
+}
+
+// ------------------------------------------------------------------ modifica in linea
+/**
+ * Riquadro di modifica che si apre al posto di una riga di un elenco.
+ *   campi:  [{ chiave, etichetta, attributi, intera }]  (intera = occupa tutta la riga)
+ *   valori: l'oggetto da modificare (viene copiato: l'originale cambia solo con "Salva")
+ *   salva(copia), annulla(): cosa fare con i due bottoni
+ */
+export function formModifica({ campi, valori, salva, annulla, extra = null }) {
+  const copia = { ...valori };
+  return h("div", { class: "modifica" },
+    h("div", { class: "griglia-modifica" }, campi.map((c) => {
+      const el = campo(c.etichetta, h("input", {
+        type: "text", value: copia[c.chiave] ?? "", ...(c.attributi || {}),
+        oninput: (e) => (copia[c.chiave] = e.target.value),
+      }));
+      if (c.intera) el.classList.add("intera");
+      return el;
+    })),
+    extra,
+    h("div", { class: "azioni-modifica" },
+      h("button", { type: "button", class: "secondario", onclick: annulla }, "Annulla"),
+      h("button", { type: "button", class: "primario", onclick: () => salva(copia) }, "Salva")));
 }

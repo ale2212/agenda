@@ -11,9 +11,10 @@ import * as db from "./db.js";
 import * as ui from "./ui.js";
 import finanze from "./moduli/finanze.js";
 import palestra from "./moduli/palestra.js";
+import abitudini from "./moduli/abitudini.js";
 import dati from "./moduli/dati.js";
 
-const MODULI = [finanze, palestra];   // ← i moduli dell'app, in quest'ordine
+const MODULI = [finanze, palestra, abitudini];   // ← i moduli dell'app, in quest'ordine
 const SISTEMA = [dati];               // ← pagine di servizio (backup)
 
 const ICONA_HOME =
@@ -119,6 +120,13 @@ mostra();
 db.chiediPersistenza();
 
 // Il "service worker" salva i file dell'app sul telefono: così si apre anche offline.
+// Quando pubblichi una versione nuova, la scarica in background e mostra un avviso.
 if ("serviceWorker" in navigator) {
+  const giaInstallata = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!giaInstallata || document.getElementById("aggiornamento")) return; // prima installazione: niente avviso
+    document.body.append(h("button", { id: "aggiornamento", type: "button", onclick: () => location.reload() },
+      "Nuova versione disponibile. Tocca per aggiornare"));
+  });
   navigator.serviceWorker.register("./sw.js").catch(() => {});
 }
