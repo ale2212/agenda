@@ -248,3 +248,60 @@ export function formModifica({ campi, valori, salva, annulla, extra = null }) {
       h("button", { type: "button", class: "secondario", onclick: annulla }, "Annulla"),
       h("button", { type: "button", class: "primario", onclick: () => salva(copia) }, "Salva")));
 }
+
+// ------------------------------------------------------------------ strumenti per gli elenchi modificabili
+// (usati da Palestra per le schede e da Dieta per il piano)
+export const nuovoId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
+
+let intestazioneAperta = null;    // "collezione:id" del documento di cui stai modificando nome e data
+
+/** Sposta un elemento di un posto (delta = -1 su, +1 giù) tra quelli dello stesso gruppo. */
+export function spostaNelGruppo(lista, elemento, gruppo, delta) {
+  const stessi = lista.filter((x) => x[gruppo] === elemento[gruppo]);
+  const altro = stessi[stessi.indexOf(elemento) + delta];
+  if (!altro) return false;
+  const i = lista.indexOf(elemento), j = lista.indexOf(altro);
+  [lista[i], lista[j]] = [lista[j], lista[i]];
+  return true;
+}
+
+/** Intestazione con nome, data e note di un documento (una scheda, una dieta), modificabile. */
+export function intestazioneModificabile(doc, ctx, nomeTipo) {
+  const chiaveDoc = `${doc.collezione}:${doc.id}`;
+  if (intestazioneAperta !== chiaveDoc) {
+    return h("div", { class: "titolo-scheda" },
+      h("div", {},
+        h("h2", {}, doc.nome),
+        h("p", { class: "nota" }, `Dal ${dataBreve(doc.dataInizio)}`),
+        doc.note ? h("p", { class: "nota-trainer" }, doc.note) : null),
+      h("button", { type: "button", class: "link", onclick: () => { intestazioneAperta = chiaveDoc; ctx.ricarica(); } },
+        "Rinomina"));
+  }
+  return formModifica({
+    valori: doc,
+    campi: [
+      { chiave: "nome", etichetta: `Nome della ${nomeTipo}` },
+      { chiave: "dataInizio", etichetta: "Inizio", attributi: { type: "date" } },
+      { chiave: "note", etichetta: "Note generali", intera: true, attributi: { placeholder: "Facoltative" } },
+    ],
+    annulla: () => { intestazioneAperta = null; ctx.ricarica(); },
+    salva: async (m) => {
+      if (!m.nome.trim()) { avviso("Il nome non può essere vuoto"); return; }
+      await ctx.db.aggiorna({ ...doc, nome: m.nome.trim(), dataInizio: m.dataInizio || doc.dataInizio, note: (m.note || "").trim() });
+      intestazioneAperta = null;
+      avviso("Modifiche salvate");
+      ctx.ricarica();
+    },
+  });
+}
+
+/** Bottoni per spostare su e giù l'elemento in modifica. */
+export function bottoniSposta(sposta) {
+  return h("div", { class: "sposta" },
+    h("span", { class: "etichetta" }, "Posizione"),
+    h("button", { type: "button", class: "secondario", "aria-label": "Sposta su", onclick: () => sposta(-1) }, "↑ Su"),
+    h("button", { type: "button", class: "secondario", "aria-label": "Sposta giù", onclick: () => sposta(1) }, "↓ Giù"));
+}
+
+/** Chiude l'eventuale intestazione aperta in modifica (es. quando cambi documento). */
+export function chiudiIntestazione() { intestazioneAperta = null; }

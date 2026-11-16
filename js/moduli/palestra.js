@@ -4,14 +4,14 @@
 //   "palestra.schede"   → { nome, dataInizio, note, esercizi: [{ id, giorno, nome, serie, ripetizioni, recupero, note }] }
 //   "palestra.registro" → { data, esercizio, carico, ripetizioni, note }
 //   "palestra.misure"   → { data, valori: { peso: 72.4, massa_grassa: 16.1, ... } }
-//   "palestra.dieta"    → { nome, dataInizio, note, ordinePasti, voci: [{ id, pasto, alimento, quantita, note }] }
 //
 // Il registro salva il NOME dell'esercizio: i progressi su "Panca piana"
 // continuano anche quando passi a una scheda nuova.
 // =============================================================================
 
 import { h, numero, oggi, dataBreve, giorniFa, leggiNumero, avviso, segmenti, campo,
-         inputNumero, vuoto, conferma, graficoLinea, formModifica } from "../ui.js";
+         inputNumero, vuoto, conferma, graficoLinea, formModifica,
+         nuovoId, spostaNelGruppo, intestazioneModificabile, bottoniSposta } from "../ui.js";
 
 const SCHEDE = "palestra.schede";
 const REGISTRO = "palestra.registro";
@@ -34,7 +34,6 @@ let bozzaAllenamento = { data: oggi(), valori: {} };
 let bozzaMisure = { data: oggi(), valori: {} };
 let bozzaEsercizio = { giorno: "", nome: "", serie: "3", ripetizioni: "8-10", recupero: "", note: "" };
 
-const nuovoId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
 const chiave = (nome) => nome.trim().toLowerCase();
 
 // ---------------------------------------------------------------- lettura dati
@@ -309,56 +308,6 @@ async function misure(el, ctx) {
 
 // ================================================================ SCHEDE
 let esercizioInModifica = null;   // id dell'esercizio aperto in modifica
-let intestazioneAperta = null;    // "collezione:id" del documento di cui stai modificando nome e data
-
-/** Sposta un elemento di un posto (delta = -1 su, +1 giù) tra quelli dello stesso gruppo. */
-function spostaNelGruppo(lista, elemento, gruppo, delta) {
-  const stessi = lista.filter((x) => x[gruppo] === elemento[gruppo]);
-  const altro = stessi[stessi.indexOf(elemento) + delta];
-  if (!altro) return false;
-  const i = lista.indexOf(elemento), j = lista.indexOf(altro);
-  [lista[i], lista[j]] = [lista[j], lista[i]];
-  return true;
-}
-
-/** Intestazione con nome e data, modificabile (usata da schede e dieta). */
-function intestazioneModificabile(doc, ctx, nomeTipo) {
-  const chiaveDoc = `${doc.collezione}:${doc.id}`;
-  if (intestazioneAperta !== chiaveDoc) {
-    return h("div", { class: "titolo-scheda" },
-      h("div", {},
-        h("h2", {}, doc.nome),
-        h("p", { class: "nota" }, `Dal ${dataBreve(doc.dataInizio)}`),
-        doc.note ? h("p", { class: "nota-trainer" }, doc.note) : null),
-      h("button", { type: "button", class: "link", onclick: () => { intestazioneAperta = chiaveDoc; ctx.ricarica(); } },
-        "Rinomina"));
-  }
-  return formModifica({
-    valori: doc,
-    campi: [
-      { chiave: "nome", etichetta: `Nome della ${nomeTipo}` },
-      { chiave: "dataInizio", etichetta: "Inizio", attributi: { type: "date" } },
-      { chiave: "note", etichetta: "Note generali", intera: true, attributi: { placeholder: "Facoltative" } },
-    ],
-    annulla: () => { intestazioneAperta = null; ctx.ricarica(); },
-    salva: async (m) => {
-      if (!m.nome.trim()) { avviso("Il nome non può essere vuoto"); return; }
-      await ctx.db.aggiorna({ ...doc, nome: m.nome.trim(), dataInizio: m.dataInizio || doc.dataInizio, note: (m.note || "").trim() });
-      intestazioneAperta = null;
-      avviso("Modifiche salvate");
-      ctx.ricarica();
-    },
-  });
-}
-
-/** Bottoni per spostare su e giù l'elemento in modifica. */
-function bottoniSposta(sposta) {
-  return h("div", { class: "sposta" },
-    h("span", { class: "etichetta" }, "Posizione"),
-    h("button", { type: "button", class: "secondario", "aria-label": "Sposta su", onclick: () => sposta(-1) }, "↑ Su"),
-    h("button", { type: "button", class: "secondario", "aria-label": "Sposta giù", onclick: () => sposta(1) }, "↓ Giù"));
-}
-
 async function schede(el, ctx) {
   const tutte = await leggiSchede(ctx.db);
   const registro = await leggiRegistro(ctx.db);
@@ -501,188 +450,6 @@ async function schede(el, ctx) {
       } }, "Elimina scheda")));
 }
 
-// ================================================================ DIETA
-// Una dieta: { nome, dataInizio, note, voci: [{ id, pasto, alimento, quantita, note }] }
-// La quantità è testo libero ("80 g", "1 vasetto", "q.b."), come la scrive il nutrizionista.
-const DIETA = "palestra.dieta";
-// I pasti con questi nomi vengono messi in quest'ordine; gli altri seguono.
-const ORDINE_PASTI = ["colazione", "spuntino", "spuntino mattina", "pranzo", "merenda",
-  "spuntino pomeriggio", "pre allenamento", "post allenamento", "cena", "dopo cena"];
-
-let dietaScelta = null;
-let dietaInModifica = false;      // modalità modifica attiva
-let voceInModifica = null;
-let bozzaVoce = { pasto: "Colazione", alimento: "", quantita: "", note: "" };
-
-async function leggiDiete(db) {
-  const d = await db.tutti(DIETA);
-  return d.sort((a, b) => b.dataInizio.localeCompare(a.dataInizio) || b.id - a.id);
-}
-
-/**
- * L'ordine dei pasti. Se l'hai deciso tu (dieta.ordinePasti, con i pulsanti su/giù) vale quello;
- * i pasti che non ci sono ancora (appena creati o rinominati) vanno in fondo.
- * Se non l'hai mai toccato, si usa l'ordine automatico per nome (ORDINE_PASTI).
- */
-function pastiDi(dieta) {
-  const pasti = [...new Set(dieta.voci.map((v) => v.pasto))];
-  const automatico = (p) => {
-    const i = ORDINE_PASTI.indexOf(p.toLowerCase());
-    return i === -1 ? 100 + pasti.indexOf(p) : i;
-  };
-  const scelto = dieta.ordinePasti || [];
-  const posizione = (p) => (scelto.includes(p) ? scelto.indexOf(p) : 1000 + automatico(p));
-  return pasti.sort((a, b) => posizione(a) - posizione(b));
-}
-
-async function dieta(el, ctx) {
-  const diete = await leggiDiete(ctx.db);
-
-  const formNuova = () => {
-    const nome = h("input", { type: "text", value: diete.length ? "" : "La mia dieta", placeholder: "es. Dieta novembre" });
-    const inizio = h("input", { type: "date", value: oggi() });
-    return h("details", { class: "gruppo apribile", open: !diete.length },
-      h("summary", {}, "Nuova dieta"),
-      campo("Nome", nome),
-      campo("Inizio", inizio),
-      h("button", { class: "primario", type: "button", onclick: async () => {
-        if (!nome.value.trim()) { avviso("Dai un nome alla dieta"); nome.focus(); return; }
-        dietaScelta = await ctx.db.aggiungi(DIETA, {
-          nome: nome.value.trim(), dataInizio: inizio.value || oggi(), note: "", voci: [] });
-        dietaInModifica = true;
-        avviso("Dieta creata: aggiungi gli alimenti");
-        ctx.ricarica();
-      } }, "Crea dieta"));
-  };
-
-  if (!diete.length) {
-    el.append(vuoto("Inserisci la dieta del nutrizionista per averla sempre a portata di mano."), formNuova());
-    return;
-  }
-
-  const d = diete.find((x) => x.id === dietaScelta) || diete[0];
-  const salvaDieta = async () => { await ctx.db.aggiorna(d); ctx.ricarica(); };
-  const pasti = pastiDi(d);
-
-  if (diete.length > 1) {
-    el.append(campo("Dieta", h("select", {
-      onchange: (e) => { dietaScelta = Number(e.target.value); voceInModifica = null; ctx.ricarica(); },
-    }, diete.map((x) => h("option", { value: x.id, selected: x.id === d.id }, `${x.nome} (dal ${dataBreve(x.dataInizio)})`)))));
-  }
-
-  const alterna = () => { dietaInModifica = !dietaInModifica; voceInModifica = null; intestazioneAperta = null; ctx.ricarica(); };
-  // append() di un elemento HTML non accetta liste: con "..." le "spacchettiamo"
-  el.append(...(dietaInModifica
-    ? [intestazioneModificabile(d, ctx, "dieta"),
-       h("button", { type: "button", class: "primario", onclick: alterna }, "Fine modifiche"),
-       h("p", { class: "nota" }, "Tocca un alimento per modificarlo. Con le frecce accanto ai pasti cambi il loro ordine.")]
-    : [h("div", { class: "titolo-scheda" },
-        h("div", {},
-          h("h2", {}, d.nome),
-          h("p", { class: "nota" }, `Dal ${dataBreve(d.dataInizio)}`),
-          d.note ? h("p", { class: "nota-trainer" }, d.note) : null),
-        h("button", { type: "button", class: "link", onclick: alterna }, "Modifica"))]));
-
-  if (!pasti.length) el.append(h("p", { class: "nota" }, "Nessun alimento: aggiungi il primo qui sotto."));
-
-  const modificaVoce = (v) => formModifica({
-    valori: v,
-    campi: [
-      { chiave: "alimento", etichetta: "Alimento" },
-      { chiave: "quantita", etichetta: "Quantità" },
-      { chiave: "pasto", etichetta: "Pasto", attributi: { list: "lista-pasti" } },
-      { chiave: "note", etichetta: "Note o alternative" },
-    ],
-    extra: bottoniSposta(async (delta) => { if (spostaNelGruppo(d.voci, v, "pasto", delta)) await salvaDieta(); }),
-    annulla: () => { voceInModifica = null; ctx.ricarica(); },
-    salva: async (m) => {
-      if (!m.alimento.trim() || !m.pasto.trim()) { avviso("Indica pasto e alimento"); return; }
-      Object.assign(v, { alimento: m.alimento.trim(), quantita: m.quantita.trim(), pasto: m.pasto.trim(), note: m.note.trim() });
-      voceInModifica = null;
-      avviso("Alimento aggiornato");
-      await salvaDieta();
-    },
-  });
-
-  // Sposta un pasto intero di un posto (delta = -1 su, +1 giù) e ricorda l'ordine nella dieta
-  const spostaPasto = async (p, delta) => {
-    const ordine = [...pasti];
-    const i = ordine.indexOf(p), j = i + delta;
-    if (j < 0 || j >= ordine.length) return;
-    [ordine[i], ordine[j]] = [ordine[j], ordine[i]];
-    d.ordinePasti = ordine;
-    await salvaDieta();
-  };
-
-  for (const [n, p] of pasti.entries()) {
-    const titolo = !dietaInModifica ? h("h3", { class: "titolo-giorno" }, p)
-      : h("div", { class: "titolo-pasto" },
-          h("h3", { class: "titolo-giorno" }, p),
-          h("button", { type: "button", class: "sposta-pasto", "aria-label": `Sposta ${p} su`, disabled: n === 0,
-            onclick: () => spostaPasto(p, -1) }, "↑"),
-          h("button", { type: "button", class: "sposta-pasto", "aria-label": `Sposta ${p} giù`, disabled: n === pasti.length - 1,
-            onclick: () => spostaPasto(p, 1) }, "↓"));
-    el.append(titolo,
-      h("ul", { class: "elenco" }, d.voci.filter((v) => v.pasto === p).map((v) => {
-        const contenuto = [
-          h("div", { class: "riga-testo" },
-            h("span", { class: "riga-titolo" }, v.alimento),
-            v.note ? h("span", { class: "riga-sotto" }, v.note) : null),
-          v.quantita ? h("span", { class: "quantita" }, v.quantita) : null,
-        ];
-        if (!dietaInModifica) return h("li", { class: "riga" }, contenuto);
-        if (v.id === voceInModifica) return h("li", {}, modificaVoce(v));
-        return h("li", { class: "riga-con-azione" },
-          h("button", { type: "button", class: "riga riga-tocca", "aria-label": `Modifica ${v.alimento}`,
-            onclick: () => { voceInModifica = v.id; ctx.ricarica(); } }, contenuto),
-          h("button", { class: "elimina", type: "button", "aria-label": `Elimina ${v.alimento}`,
-            onclick: async () => {
-              if (await conferma(`Togliere ${v.alimento} da ${p}?`)) {
-                d.voci = d.voci.filter((x) => x.id !== v.id);
-                await salvaDieta();
-              }
-            } }, "×"));
-      })));
-  }
-
-  if (!dietaInModifica) return;
-
-  const b = bozzaVoce;
-  const legato = (k, attr = {}) => h("input", { type: "text", value: b[k], ...attr, oninput: (e) => (b[k] = e.target.value) });
-  const suggeriti = [...new Set([...pasti, "Colazione", "Spuntino", "Pranzo", "Merenda", "Cena"])];
-  el.append(
-    h("datalist", { id: "lista-pasti" }, suggeriti.map((p) => h("option", { value: p }))),
-    h("section", { class: "gruppo" },
-      h("h2", { class: "nel-gruppo" }, "Aggiungi alimento"),
-      campo("Pasto", legato("pasto", { list: "lista-pasti" })),
-      h("div", { class: "due-colonne" },
-        campo("Alimento", legato("alimento", { placeholder: "es. Fiocchi d'avena", autocapitalize: "sentences" })),
-        campo("Quantità", legato("quantita", { placeholder: "es. 50 g" }))),
-      campo("Note o alternative", legato("note", { placeholder: "es. oppure 60 g di pane integrale" })),
-      h("button", { class: "primario", type: "button", onclick: async () => {
-        if (!b.pasto.trim() || !b.alimento.trim()) { avviso("Indica pasto e alimento"); return; }
-        d.voci.push({ id: nuovoId(), pasto: b.pasto.trim(), alimento: b.alimento.trim(),
-          quantita: b.quantita.trim(), note: b.note.trim() });
-        avviso(`${b.alimento.trim()} aggiunto`);
-        bozzaVoce = { pasto: b.pasto, alimento: "", quantita: "", note: "" }; // il pasto resta: comodo per inserirne tanti
-        await salvaDieta();
-      } }, "Aggiungi alla dieta")),
-    formNuova(),
-    h("div", { class: "azioni-secondarie" },
-      h("button", { type: "button", class: "secondario", onclick: async () => {
-        dietaScelta = await ctx.db.aggiungi(DIETA, {
-          nome: `${d.nome} (copia)`, dataInizio: oggi(), note: d.note, ordinePasti: d.ordinePasti,
-          voci: d.voci.map((v) => ({ ...v, id: nuovoId() })) });
-        avviso("Dieta duplicata: modifica solo ciò che cambia");
-        ctx.ricarica();
-      } }, "Duplica dieta"),
-      h("button", { type: "button", class: "secondario pericolo", onclick: async () => {
-        if (await conferma(`Eliminare "${d.nome}"?`)) {
-          await ctx.db.elimina(d.id); dietaScelta = null; ctx.ricarica();
-        }
-      } }, "Elimina dieta")));
-}
-
 // ================================================================ HOME
 async function riepilogo(ctx) {
   const storico = await leggiMisure(ctx.db);
@@ -709,7 +476,6 @@ export default {
     { id: "progressi", nome: "Progressi", render: progressi },
     { id: "misure", nome: "Misure", render: misure },
     { id: "schede", nome: "Schede", render: schede },
-    { id: "dieta", nome: "Dieta", render: dieta },
   ],
   riepilogo,
 };

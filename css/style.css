@@ -15,6 +15,7 @@
   --finanze: #0e7a6b;     /* verde petrolio */
   --palestra: #3346c8;    /* blu oltremare */
   --abitudini: #a3366f;   /* lampone */
+  --dieta: #b4531a;       /* arancio carota */
   --entrata: #0e7a6b;
   --uscita: #b6432f;
   --buono: #1b7f47;
@@ -42,6 +43,7 @@
     --finanze: #3fc4b0;
     --palestra: #93a1ff;
     --abitudini: #f08fc4;
+    --dieta: #f2a36b;
     --entrata: #3fc4b0;
     --uscita: #f08a75;
     --buono: #5fd394;
@@ -625,7 +627,7 @@ input.carico {
 .legenda-cal { display: flex; gap: 16px; font-size: 13px; color: var(--tenue); flex-wrap: wrap; }
 .legenda-cal > span { display: flex; align-items: center; gap: 6px; }
 .legenda-cal .cella { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--linea); }
-.legenda-cal .cella.fatto { background: var(--abitudini); }
+.legenda-cal .cella.fatto { background: var(--accento); }
 
 .giorni-scelta { display: flex; gap: 6px; }
 .giorni-scelta button {
@@ -720,3 +722,77 @@ input.carico {
   font-weight: 600;
 }
 .sposta-pasto:disabled { opacity: 0.3; }
+
+/* ---------------------------------------------------------------- dieta: checklist dei pasti */
+.barra-piena.dieta { background: var(--accento); }
+.pasto-check {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+  min-height: 64px;
+  padding: 10px 8px 10px 16px;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+.spunta-pasto {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid var(--linea);
+  display: grid;
+  place-items: center;
+  font: 700 14px var(--numeri);
+  color: var(--accento);
+  transition: background 0.15s, border-color 0.15s;
+}
+.spunta-pasto svg { width: 18px; height: 18px; fill: none; stroke: var(--su-accento); stroke-width: 2.6;
+  stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+.pasto-check.perfetto .spunta-pasto { background: var(--accento); border-color: var(--accento); }
+.pasto-check.perfetto .spunta-pasto svg { opacity: 1; }
+/* parziale: cerchio pieno a metà */
+.pasto-check.parziale .spunta-pasto {
+  border-color: var(--accento);
+  background: linear-gradient(90deg, var(--accento) 50%, transparent 50%);
+}
+.pasto-check.libero .spunta-pasto { border-style: dashed; border-color: var(--accento); }
+.pasto-check .riga-sotto { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pasto-check.perfetto .riga-sotto, .pasto-check.parziale .riga-sotto, .pasto-check.libero .riga-sotto {
+  color: var(--accento); font-weight: 600;
+}
+button.libero {
+  flex: none;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid var(--linea);
+  border-radius: 999px;
+  background: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tenue);
+}
+button.libero.attivo { border-color: var(--accento); color: var(--accento); border-style: dashed; }
+
+/* calendario: sfumature di riuscita */
+.cella.buono { background: color-mix(in srgb, var(--accento) 60%, var(--superficie)); }
+.cella.medio { background: color-mix(in srgb, var(--accento) 28%, var(--superficie)); }
+.cella.con-libero { position: relative; }
+.cella.con-libero::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--inchiostro);
+  opacity: 0.55;
+}
+.legenda-cal .cella.legenda-libero { background: var(--campo); }
+.legenda-cal .cella.legenda-libero::after { right: 3px; top: 3px; width: 4px; height: 4px; }
+.totale-sett.media { color: var(--tenue); background: var(--campo); }
+.totale-sett.vuota { background: transparent; }
+.torna-oggi { align-self: center; margin-top: -8px; }

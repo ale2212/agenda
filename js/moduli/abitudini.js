@@ -220,6 +220,10 @@ async function oggiSezione(el, ctx) {
       h("span", {}, etichettaGiorno),
       h("button", { type: "button", "aria-label": "Giorno successivo", disabled: giornoVisto >= oggiISO,
         onclick: () => { giornoVisto = spostaGiorno(giornoVisto, 1); ctx.ricarica(); } }, "›")));
+  if (giornoVisto !== oggiISO) {
+    el.append(h("button", { type: "button", class: "link torna-oggi",
+      onclick: () => { giornoVisto = oggiISO; ctx.ricarica(); } }, "Torna a oggi"));
+  }
 
   // Una riga con la spunta: tocchi e segni (o togli) l'abitudine in quel giorno
   const riga = (a, sottotitolo) => {

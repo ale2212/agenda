@@ -14,9 +14,10 @@ const NOMI = {
   "palestra.schede": "Schede",
   "palestra.registro": "Carichi registrati",
   "palestra.misure": "Misurazioni",
-  "palestra.dieta": "Diete",
+  "palestra.dieta": "Piani della dieta",
   "abitudini.lista": "Abitudini",
   "abitudini.fatte": "Abitudini spuntate",
+  "dieta.giorni": "Giorni di dieta segnati",
 };
 
 function ultimoBackup() {

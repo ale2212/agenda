@@ -9,12 +9,14 @@
 
 import * as db from "./db.js";
 import * as ui from "./ui.js";
-import finanze from "./moduli/finanze.js";
+// import finanze from "./moduli/finanze.js";   // nascosto: togli le "//" qui e in MODULI per riattivarlo
 import palestra from "./moduli/palestra.js";
+import dieta from "./moduli/dieta.js";
 import abitudini from "./moduli/abitudini.js";
 import dati from "./moduli/dati.js";
 
-const MODULI = [finanze, palestra, abitudini];   // ← i moduli dell'app, in quest'ordine
+// I moduli dell'app, in quest'ordine. Finanze è nascosto ma i suoi dati restano salvati.
+const MODULI = [palestra, dieta, abitudini /* , finanze */];
 const SISTEMA = [dati];               // ← pagine di servizio (backup)
 
 const ICONA_HOME =
