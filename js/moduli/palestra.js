@@ -4,7 +4,7 @@
 //   "palestra.schede"   → { nome, dataInizio, note, esercizi: [{ id, giorno, nome, serie, ripetizioni, recupero, note }] }
 //   "palestra.registro" → { data, esercizio, carico, ripetizioni, note }
 //   "palestra.misure"   → { data, valori: { peso: 72.4, massa_grassa: 16.1, ... } }
-//   "palestra.dieta"    → { nome, dataInizio, note, voci: [{ id, pasto, alimento, quantita, note }] }
+//   "palestra.dieta"    → { nome, dataInizio, note, ordinePasti, voci: [{ id, pasto, alimento, quantita, note }] }
 //
 // Il registro salva il NOME dell'esercizio: i progressi su "Panca piana"
 // continuano anche quando passi a una scheda nuova.
@@ -519,12 +519,19 @@ async function leggiDiete(db) {
   return d.sort((a, b) => b.dataInizio.localeCompare(a.dataInizio) || b.id - a.id);
 }
 
+/**
+ * L'ordine dei pasti. Se l'hai deciso tu (dieta.ordinePasti, con i pulsanti su/giù) vale quello;
+ * i pasti che non ci sono ancora (appena creati o rinominati) vanno in fondo.
+ * Se non l'hai mai toccato, si usa l'ordine automatico per nome (ORDINE_PASTI).
+ */
 function pastiDi(dieta) {
   const pasti = [...new Set(dieta.voci.map((v) => v.pasto))];
-  const posizione = (p) => {
+  const automatico = (p) => {
     const i = ORDINE_PASTI.indexOf(p.toLowerCase());
     return i === -1 ? 100 + pasti.indexOf(p) : i;
   };
+  const scelto = dieta.ordinePasti || [];
+  const posizione = (p) => (scelto.includes(p) ? scelto.indexOf(p) : 1000 + automatico(p));
   return pasti.sort((a, b) => posizione(a) - posizione(b));
 }
 
@@ -568,7 +575,7 @@ async function dieta(el, ctx) {
   el.append(...(dietaInModifica
     ? [intestazioneModificabile(d, ctx, "dieta"),
        h("button", { type: "button", class: "primario", onclick: alterna }, "Fine modifiche"),
-       h("p", { class: "nota" }, "Tocca un alimento per modificarlo o spostarlo.")]
+       h("p", { class: "nota" }, "Tocca un alimento per modificarlo. Con le frecce accanto ai pasti cambi il loro ordine.")]
     : [h("div", { class: "titolo-scheda" },
         h("div", {},
           h("h2", {}, d.nome),
@@ -597,8 +604,25 @@ async function dieta(el, ctx) {
     },
   });
 
-  for (const p of pasti) {
-    el.append(h("h3", { class: "titolo-giorno" }, p),
+  // Sposta un pasto intero di un posto (delta = -1 su, +1 giù) e ricorda l'ordine nella dieta
+  const spostaPasto = async (p, delta) => {
+    const ordine = [...pasti];
+    const i = ordine.indexOf(p), j = i + delta;
+    if (j < 0 || j >= ordine.length) return;
+    [ordine[i], ordine[j]] = [ordine[j], ordine[i]];
+    d.ordinePasti = ordine;
+    await salvaDieta();
+  };
+
+  for (const [n, p] of pasti.entries()) {
+    const titolo = !dietaInModifica ? h("h3", { class: "titolo-giorno" }, p)
+      : h("div", { class: "titolo-pasto" },
+          h("h3", { class: "titolo-giorno" }, p),
+          h("button", { type: "button", class: "sposta-pasto", "aria-label": `Sposta ${p} su`, disabled: n === 0,
+            onclick: () => spostaPasto(p, -1) }, "↑"),
+          h("button", { type: "button", class: "sposta-pasto", "aria-label": `Sposta ${p} giù`, disabled: n === pasti.length - 1,
+            onclick: () => spostaPasto(p, 1) }, "↓"));
+    el.append(titolo,
       h("ul", { class: "elenco" }, d.voci.filter((v) => v.pasto === p).map((v) => {
         const contenuto = [
           h("div", { class: "riga-testo" },
@@ -647,7 +671,7 @@ async function dieta(el, ctx) {
     h("div", { class: "azioni-secondarie" },
       h("button", { type: "button", class: "secondario", onclick: async () => {
         dietaScelta = await ctx.db.aggiungi(DIETA, {
-          nome: `${d.nome} (copia)`, dataInizio: oggi(), note: d.note,
+          nome: `${d.nome} (copia)`, dataInizio: oggi(), note: d.note, ordinePasti: d.ordinePasti,
           voci: d.voci.map((v) => ({ ...v, id: nuovoId() })) });
         avviso("Dieta duplicata: modifica solo ciò che cambia");
         ctx.ricarica();
