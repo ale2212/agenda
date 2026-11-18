@@ -135,7 +135,14 @@ async function allenamento(el, ctx) {
     });
 
     // Recupero: tempo letto dalla scheda ("90"", "2'", "1'30"...), altrimenti 90 secondi
-    const secondi = timer.leggiDurata(es.recupero) || RECUPERO_PREDEFINITO;
+    const letti = timer.leggiDurata(es.recupero);
+    const secondi = letti || RECUPERO_PREDEFINITO;
+    // Se nella scheda c'è scritto qualcosa che non capisco, lo dico invece di usare 1:30 in silenzio
+    const nonCapito = es.recupero && !letti
+      ? h("p", { class: "avviso-recupero" },
+          `Non riesco a leggere il recupero "${es.recupero}": uso ${timer.formato(RECUPERO_PREDEFINITO * 1000)}. ` +
+          "Correggilo nella scheda, per esempio 2'30\" oppure 90\".")
+      : null;
     const totaleSerie = Number(es.serie) || null;
     const contatore = h("span", { class: "serie-fatte" });
     const mostraSerie = () => {
@@ -174,6 +181,7 @@ async function allenamento(el, ctx) {
         giaFatto.length ? h("span", { class: "gia-fatto" },
           `Già registrato in questa data: ${giaFatto.map((r) => kg(r.carico)).join(", ")}`) : null),
       recupero,
+      nonCapito,
       h("div", { class: "input-esercizio" },
         h("label", { class: "campo campo-carico" },
           h("span", { class: "etichetta" }, "Carico"),

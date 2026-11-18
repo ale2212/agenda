@@ -899,3 +899,4 @@ body.lampeggio { animation: lampeggio 1.2s ease-in-out 2; }
 .tre-colonne .cifra, .due-colonne .cifra { display: block; }
 .tre-colonne .nota, .due-colonne .nota { display: block; }
 .avvia-recupero { white-space: nowrap; }
+.avviso-recupero { margin: -4px 0 0; font-size: 13px; color: var(--cattivo); }

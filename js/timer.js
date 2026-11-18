@@ -41,17 +41,24 @@ export function formato(ms) {
 }
 
 /**
- * Legge un tempo di recupero scritto a mano e lo trasforma in secondi:
- *   "90"" → 90 · "90 s" → 90 · "2'" → 120 · "1'30" → 90 · "1:30" → 90 · "2 min" → 120 · "90" → 90 · "2" → 120
+ * Legge un tempo di recupero scritto a mano e lo trasforma in secondi (null se non lo capisce):
+ *   "90"" → 90 · "90 s" → 90 · "2'" → 120 · "2 minuti" → 120 · "1'30" → 90 · "2’30”" → 150
+ *   "1:30" → 90 · "1.30" → 90 · "1 min 30" → 90 · "1m30s" → 90 · "90" → 90 · "2" → 120
  */
 export function leggiDurata(testo) {
   if (!testo) return null;
-  const t = String(testo).toLowerCase().replace(/\s+/g, "").replace("’", "'").replace("″", '"').replace("''", '"');
+  const t = String(testo).toLowerCase()
+    // iPhone trasforma da solo ' e " in apostrofi e virgolette "curvi": li riportiamo a quelli dritti
+    .replace(/[’‘′`´]/g, "'")
+    .replace(/[”“″«»]/g, '"')
+    .replace(/''/g, '"')
+    .replace(/\s+/g, "");
   let m;
-  if ((m = t.match(/^(\d+)[':](\d{1,2})"?$/))) return Number(m[1]) * 60 + Number(m[2]);   // 1'30 o 1:30
-  if ((m = t.match(/^(\d+)(min|m|')$/))) return Number(m[1]) * 60;                          // 2' o 2min
-  if ((m = t.match(/^(\d+)(s|sec|secondi|")$/))) return Number(m[1]);                       // 90" o 90s
-  if ((m = t.match(/^(\d+)$/))) return Number(m[1]) <= 10 ? Number(m[1]) * 60 : Number(m[1]); // 2 = minuti, 90 = secondi
+  if ((m = t.match(/^(\d+)[':.,](\d{2})"?$/))) return Number(m[1]) * 60 + Number(m[2]);              // 1'30 · 1:30 · 1.30
+  if ((m = t.match(/^(\d+)(?:minuti|minuto|min|m)(\d{1,2})(?:secondi|sec|s|")?$/))) return Number(m[1]) * 60 + Number(m[2]); // 1min30 · 1m30s
+  if ((m = t.match(/^(\d+)(?:minuti|minuto|min|m|')$/))) return Number(m[1]) * 60;                   // 2' · 2min · 2minuti
+  if ((m = t.match(/^(\d+)(?:secondi|secondo|sec|s|")$/))) return Number(m[1]);                       // 90" · 90s · 90secondi
+  if ((m = t.match(/^(\d+)$/))) return Number(m[1]) <= 10 ? Number(m[1]) * 60 : Number(m[1]);      // 2 = minuti, 90 = secondi
   return null;
 }
 

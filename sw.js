@@ -6,7 +6,7 @@
 // scarica i file nuovi in background e li usa dall'apertura successiva.
 // =============================================================================
 
-const VERSIONE = "agenda-v7";
+const VERSIONE = "agenda-v8";
 
 const FILE = [
   "./",
