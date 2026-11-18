@@ -9,14 +9,17 @@
 
 import * as db from "./db.js";
 import * as ui from "./ui.js";
-// import finanze from "./moduli/finanze.js";   // nascosto: togli le "//" qui e in MODULI per riattivarlo
+import * as timer from "./timer.js";
+// Moduli nascosti (i loro dati restano salvati): togli le "//" qui e in MODULI per riattivarli
+// import finanze from "./moduli/finanze.js";
+// import abitudini from "./moduli/abitudini.js";
 import palestra from "./moduli/palestra.js";
 import dieta from "./moduli/dieta.js";
-import abitudini from "./moduli/abitudini.js";
+import produttivita from "./moduli/produttivita.js";
 import dati from "./moduli/dati.js";
 
-// I moduli dell'app, in quest'ordine. Finanze è nascosto ma i suoi dati restano salvati.
-const MODULI = [palestra, dieta, abitudini /* , finanze */];
+// I moduli dell'app, in quest'ordine. Finanze e Abitudini sono nascosti, ma i loro dati restano salvati.
+const MODULI = [palestra, dieta, produttivita /* , abitudini, finanze */];
 const SISTEMA = [dati];               // ← pagine di servizio (backup)
 
 const ICONA_HOME =
@@ -114,6 +117,13 @@ function aggiornaBarra(attivo) {
 
 // ---------------------------------------------------------------- avvio
 costruisciBarra();
+// Motore dei timer: quando un pomodoro cambia fase, ridisegna la pagina se la stai guardando
+timer.avviaMotore({
+  alCambio: (t) => {
+    const pagina = location.hash || "#/";
+    if (t.id === "pomodoro" && (pagina.startsWith("#/produttivita") || pagina === "#/")) ctx.ricarica();
+  },
+});
 window.addEventListener("hashchange", () => {
   document.getElementById("avviso")?.classList.remove("visibile"); // niente messaggi della pagina precedente
   mostra();

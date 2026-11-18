@@ -12,6 +12,9 @@
 import { h, numero, oggi, dataBreve, giorniFa, leggiNumero, avviso, segmenti, campo,
          inputNumero, vuoto, conferma, graficoLinea, formModifica,
          nuovoId, spostaNelGruppo, intestazioneModificabile, bottoniSposta } from "../ui.js";
+import * as timer from "../timer.js";
+
+const RECUPERO_PREDEFINITO = 90; // secondi, se nella scheda il recupero non è indicato
 
 const SCHEDE = "palestra.schede";
 const REGISTRO = "palestra.registro";
@@ -30,7 +33,7 @@ const MISURE = [
 let schedaScelta = null;
 let giornoScelto = null;
 let esercizioScelto = null;
-let bozzaAllenamento = { data: oggi(), valori: {} };
+let bozzaAllenamento = { data: oggi(), valori: {}, serie: {} }; // serie: id esercizio → serie completate
 let bozzaMisure = { data: oggi(), valori: {} };
 let bozzaEsercizio = { giorno: "", nome: "", serie: "3", ripetizioni: "8-10", recupero: "", note: "" };
 
@@ -131,6 +134,31 @@ async function allenamento(el, ctx) {
       oninput: (e) => (valori.carico = e.target.value),
     });
 
+    // Recupero: tempo letto dalla scheda ("90"", "2'", "1'30"...), altrimenti 90 secondi
+    const secondi = timer.leggiDurata(es.recupero) || RECUPERO_PREDEFINITO;
+    const totaleSerie = Number(es.serie) || null;
+    const contatore = h("span", { class: "serie-fatte" });
+    const mostraSerie = () => {
+      const n = bozzaAllenamento.serie[es.id] || 0;
+      contatore.textContent = totaleSerie ? `Serie ${n}/${totaleSerie}` : `Serie ${n}`;
+    };
+    mostraSerie();
+    const recupero = h("div", { class: "recupero" },
+      contatore,
+      h("button", { type: "button", class: "serie-meno", "aria-label": `Una serie in meno per ${es.nome}`,
+        onclick: () => { bozzaAllenamento.serie[es.id] = Math.max(0, (bozzaAllenamento.serie[es.id] || 0) - 1); mostraSerie(); } }, "−"),
+      h("button", { type: "button", class: "avvia-recupero", "aria-label": `Serie finita: conta la serie e avvia il recupero di ${es.nome}`,
+        onclick: () => {
+          // Finita una serie: la conto e faccio partire il recupero
+          bozzaAllenamento.serie[es.id] = Math.min(totaleSerie || 99, (bozzaAllenamento.serie[es.id] || 0) + 1);
+          mostraSerie();
+          timer.sbloccaAudio();
+          timer.avvia("recupero", secondi * 1000, {
+            etichetta: `Recupero: ${es.nome}`, link: "#/palestra/allenamento", controlli: "regola",
+          });
+        } },
+        h("span", { "aria-hidden": "true" }, "▶ "), `Recupero ${timer.formato(secondi * 1000)}`));
+
     lista.append(h("article", { class: "esercizio" },
       h("header", {},
         h("h3", {}, es.nome),
@@ -145,6 +173,7 @@ async function allenamento(el, ctx) {
           : h("span", {}, "Prima volta: nessun carico precedente"),
         giaFatto.length ? h("span", { class: "gia-fatto" },
           `Già registrato in questa data: ${giaFatto.map((r) => kg(r.carico)).join(", ")}`) : null),
+      recupero,
       h("div", { class: "input-esercizio" },
         h("label", { class: "campo campo-carico" },
           h("span", { class: "etichetta" }, "Carico"),
@@ -170,6 +199,7 @@ async function allenamento(el, ctx) {
         ripetizioni: r.rip !== null ? Math.round(r.rip) : null, note: r.note,
       });
       delete bozzaAllenamento.valori[r.es.id];
+      delete bozzaAllenamento.serie[r.es.id];
     }
     avviso(righe.length === 1 ? "Salvato 1 esercizio" : `Salvati ${righe.length} esercizi`);
     ctx.ricarica();

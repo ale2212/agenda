@@ -16,6 +16,7 @@
   --palestra: #3346c8;    /* blu oltremare */
   --abitudini: #a3366f;   /* lampone */
   --dieta: #b4531a;       /* arancio carota */
+  --produttivita: #c0392b; /* rosso pomodoro */
   --entrata: #0e7a6b;
   --uscita: #b6432f;
   --buono: #1b7f47;
@@ -44,6 +45,7 @@
     --palestra: #93a1ff;
     --abitudini: #f08fc4;
     --dieta: #f2a36b;
+    --produttivita: #f08a7a;
     --entrata: #3fc4b0;
     --uscita: #f08a75;
     --buono: #5fd394;
@@ -796,3 +798,104 @@ button.libero.attivo { border-color: var(--accento); color: var(--accento); bord
 .totale-sett.media { color: var(--tenue); background: var(--campo); }
 .totale-sett.vuota { background: transparent; }
 .torna-oggi { align-self: center; margin-top: -8px; }
+
+/* ---------------------------------------------------------------- timer: barra flottante */
+#barra-timer {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--barra-h) + env(safe-area-inset-bottom) + 8px);
+  transform: translateX(-50%);
+  width: min(588px, calc(100% - 24px));
+  z-index: 6;
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+}
+#barra-timer.visibile { display: flex; }
+.timer-flottante {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 6px 6px 16px;
+  border-radius: 16px;
+  background: var(--inchiostro);
+  color: var(--carta);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+.timer-testo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+.timer-etichetta { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.85; }
+.timer-tempo { margin-left: auto; font: 700 24px var(--numeri); font-variant-numeric: tabular-nums; }
+.timer-flottante.in-pausa .timer-tempo { opacity: 0.55; }
+.timer-flottante button {
+  min-width: 44px;
+  height: 40px;
+  border: 0;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--carta) 16%, transparent);
+  color: inherit;
+  font: 600 14px var(--numeri);
+}
+.timer-flottante button.chiudi { font-size: 16px; }
+body.con-timer .azione-fissa { bottom: calc(var(--barra-h) + env(safe-area-inset-bottom) + 70px); }
+body.con-timer #avviso { bottom: calc(var(--barra-h) + env(safe-area-inset-bottom) + 136px); }
+body.con-timer #app { padding-bottom: calc(var(--barra-h) + env(safe-area-inset-bottom) + 90px); }
+
+/* lampeggio a fine timer */
+@keyframes lampeggio {
+  0%, 100% { box-shadow: inset 0 0 0 0 transparent; }
+  20%, 60% { box-shadow: inset 0 0 0 10px var(--accento); }
+}
+body.lampeggio { animation: lampeggio 1.2s ease-in-out 2; }
+@media (prefers-reduced-motion: reduce) { body.lampeggio { animation: none; } }
+
+/* ---------------------------------------------------------------- palestra: recupero */
+.recupero { display: flex; align-items: center; gap: 8px; }
+.serie-fatte { font-weight: 600; font-variant-numeric: tabular-nums; margin-right: auto; white-space: nowrap; }
+.serie-meno {
+  width: 36px; height: 36px; border: 0; border-radius: 10px;
+  background: var(--campo); color: var(--tenue); font-size: 20px;
+}
+.avvia-recupero {
+  min-height: 40px; padding: 8px 14px; border: 0; border-radius: 10px;
+  background: var(--accento); color: var(--su-accento); font-size: 15px; font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- produttività */
+.descrizione-preset { margin-top: -6px; }
+.chip-aggiungi { text-decoration: none; color: var(--accento); border-style: dashed; display: inline-flex; align-items: center; }
+.quadrante { position: relative; width: min(260px, 74vw); aspect-ratio: 1; margin: 6px auto 0; }
+.anello-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.anello-fondo { fill: none; stroke: var(--linea); stroke-width: 10; }
+.anello-avanzamento { fill: none; stroke: var(--accento); stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 0.25s linear; }
+.quadrante.in-pausa-fase .anello-avanzamento { stroke: var(--buono); }
+.quadrante-testo {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+}
+.quadrante-fase { font-size: 15px; color: var(--tenue); font-weight: 600; }
+.quadrante-tempo { font: 700 54px var(--numeri); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.pallini { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.pallino { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--accento); }
+.pallino.pieno { background: var(--accento); }
+.pallini .nota { margin-left: 6px; }
+.attivita-in-corso { text-align: center; font-size: 17px; font-weight: 650; color: var(--accento); margin: 0; }
+.barra-piena.attivita { background: var(--accento); }
+
+.colonne-settimana { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; align-items: end; }
+.colonna-giorno { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.colonna-traccia { width: 100%; max-width: 30px; height: 110px; border-radius: 6px; background: var(--campo); display: flex; align-items: flex-end; overflow: hidden; }
+.colonna-piena { width: 100%; background: var(--accento); border-radius: 6px 6px 0 0; }
+.colonna-valore { font: 600 10px var(--numeri); color: var(--tenue); min-height: 12px; white-space: nowrap; }
+.colonna-etichetta { font-size: 12px; color: var(--tenue); }
+.colonna-giorno.oggi .colonna-etichetta { color: var(--accento); font-weight: 700; }
+.colonna-giorno.futuro .colonna-traccia { opacity: 0.5; }
+.tre-colonne .cifra, .due-colonne .cifra { display: block; }
+.tre-colonne .nota, .due-colonne .nota { display: block; }
+.avvia-recupero { white-space: nowrap; }

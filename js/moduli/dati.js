@@ -18,6 +18,9 @@ const NOMI = {
   "abitudini.lista": "Abitudini",
   "abitudini.fatte": "Abitudini spuntate",
   "dieta.giorni": "Giorni di dieta segnati",
+  "produttivita.sessioni": "Pomodori completati",
+  "produttivita.attivita": "Attività",
+  "produttivita.impostazioni": "Impostazioni dei pomodori",
 };
 
 function ultimoBackup() {

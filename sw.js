@@ -6,7 +6,7 @@
 // scarica i file nuovi in background e li usa dall'apertura successiva.
 // =============================================================================
 
-const VERSIONE = "agenda-v6";
+const VERSIONE = "agenda-v7";
 
 const FILE = [
   "./",
@@ -16,9 +16,11 @@ const FILE = [
   "./js/app.js",
   "./js/db.js",
   "./js/ui.js",
+  "./js/timer.js",
   "./js/moduli/finanze.js",
   "./js/moduli/palestra.js",
   "./js/moduli/dieta.js",
+  "./js/moduli/produttivita.js",
   "./js/moduli/abitudini.js",
   "./js/moduli/dati.js",
   "./icone/icona-180.png",
